@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { load, save } from './lib/storage'
 import TabBar from './components/TabBar'
-import { Toaster } from './components/ui'
+import { Toaster, toast } from './components/ui'
+import OfflineBar from './components/OfflineBar'
+import { warmOfflineCache } from './lib/queries'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import Today from './pages/Today'
@@ -26,6 +28,24 @@ export default function App() {
   const loc = useLocation()
   const nav = useNavigate()
   const restored = useRef(false)
+  const [syncKey, setSyncKey] = useState(0)
+
+  // Al terminar de sincronizar, recarga la pantalla con los datos del servidor
+  useEffect(() => {
+    const onSynced = (e) => {
+      setSyncKey(k => k + 1)
+      toast(`✓ ${e.detail.sent === 1 ? 'Cambio sincronizado' : 'Cambios sincronizados'} con el servidor`)
+    }
+    window.addEventListener('sl:synced', onSynced)
+    return () => window.removeEventListener('sl:synced', onSynced)
+  }, [])
+
+  // Con conexión, deja listo en el teléfono lo necesario para entrenar sin internet
+  useEffect(() => {
+    if (!session || !profile) return
+    const t = setTimeout(() => warmOfflineCache(session.user.id), 2500)
+    return () => clearTimeout(t)
+  }, [session, profile])
 
   // Guarda la pantalla actual para volver a ella si el móvil recarga la app
   useEffect(() => {
@@ -60,10 +80,14 @@ export default function App() {
   if (recovery) return <><ResetPassword /><Toaster /></>
 
   const hideTabs = loc.pathname.startsWith('/entrenar/sesion')
+  // Tras sincronizar solo se recargan pantallas de consulta (no editores ni el entrenamiento en curso)
+  const refreshable = ['/', '/rutinas', '/progreso', '/progreso/cuerpo', '/squad'].includes(loc.pathname) || /^\/squad\/[^/]+$/.test(loc.pathname)
+  const viewKey = loc.pathname + (refreshable ? ':' + syncKey : '')
   return (
     <>
       <main className="max-w-[480px] mx-auto px-4 pt-4 pb-36 flex flex-col gap-5 safe-top">
-        <div key={loc.pathname} className="page-enter flex flex-col gap-5">
+        <OfflineBar />
+        <div key={viewKey} className="page-enter flex flex-col gap-5">
         <Routes>
           <Route path="/" element={<Today />} />
           <Route path="/rutinas" element={<Routines />} />

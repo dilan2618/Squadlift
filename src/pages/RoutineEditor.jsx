@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { editorCatalog } from '../lib/queries'
 import { useAuth } from '../lib/auth'
 import { PageHeader, toast } from '../components/ui'
 import { DAYS_LONG, friendlyError } from '../lib/utils'
@@ -22,7 +23,7 @@ export default function RoutineEditor() {
   const [newEx, setNewEx] = useState('')
 
   useEffect(() => {
-    supabase.from('exercises').select('id, name, muscle_group, equipment').order('muscle_group').order('name')
+    editorCatalog()
       .then(({ data }) => setCatalog(data || []))
     if (!isNew) {
       supabase.from('routines').select('name, day_of_week, routine_exercises(*, exercise:exercises(id, name, muscle_group))')

@@ -6,6 +6,7 @@ import { Avatar, PageHeader, toast } from '../components/ui'
 import { friendlyError } from '../lib/utils'
 import NotificationsCard from '../components/NotificationsCard'
 import { prepareAvatar } from '../lib/image'
+import { getState as getOfflineState } from '../lib/offline'
 
 export default function Profile() {
   const { user, profile, refreshProfile, signOut } = useAuth()
@@ -16,6 +17,7 @@ export default function Profile() {
   const [busy, setBusy] = useState(false)
   const [pwd, setPwd] = useState('')
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [confirmOut, setConfirmOut] = useState(0)
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
 
   async function save(e) {
@@ -154,7 +156,18 @@ export default function Profile() {
       </div>
 
       <p className="text-xs text-muted text-center m-0">{user.email}</p>
-      <button className="btn-ghost w-full" onClick={signOut}>Cerrar sesión</button>
+      {confirmOut ? (
+        <div className="card border border-danger/40">
+          <b>Tienes {confirmOut} {confirmOut === 1 ? 'cambio sin sincronizar' : 'cambios sin sincronizar'}</b>
+          <p className="text-sm text-muted m-0">Si cierras sesión ahora se borrarán del teléfono. Espera a tener conexión para que se envíen solos.</p>
+          <div className="flex gap-2">
+            <button className="btn-ghost flex-1" onClick={() => setConfirmOut(0)}>Esperar</button>
+            <button className="btn flex-1 bg-danger text-bg" onClick={signOut}>Cerrar igual</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn-ghost w-full" onClick={() => { const n = getOfflineState().pending; n ? setConfirmOut(n) : signOut() }}>Cerrar sesión</button>
+      )}
     </>
   )
 }

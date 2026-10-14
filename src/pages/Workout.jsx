@@ -5,6 +5,8 @@ import { useAuth } from '../lib/auth'
 import { toast } from '../components/ui'
 import { localDate, toUnit, fromUnit, fmtTime, friendlyError, tons } from '../lib/utils'
 import { load, save, remove } from '../lib/storage'
+import { routineForWorkout, workoutCatalog, rememberSets, recalledSets } from '../lib/queries'
+import { isOnline } from '../lib/offline'
 
 const DRAFT_KEY = id => `sl:workout:${id}`
 
@@ -44,8 +46,7 @@ export default function Workout() {
         }
         let template = []
         if (open.routine_id) {
-          const { data: r } = await supabase.from('routines')
-            .select('name, routine_exercises(*, exercise:exercises(id, name, muscle_group))').eq('id', open.routine_id).maybeSingle()
+          const { data: r } = await routineForWorkout(open.routine_id)
           if (r) { setRoutineName(r.name); template = [...r.routine_exercises].sort((a, b) => a.position - b.position) }
         } else setRoutineName('Entrenamiento libre')
 
@@ -80,7 +81,7 @@ export default function Workout() {
         }
       } catch (e) { toast(friendlyError(e), 'err'); nav('/') }
     })()
-    supabase.from('exercises').select('id, name, muscle_group').order('name').then(({ data }) => setCatalog(data || []))
+    workoutCatalog().then(({ data }) => setCatalog(data || []))
     return () => { alive = false }
   }, [user.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -186,6 +187,11 @@ export default function Workout() {
     if (error) return toast(friendlyError(error), 'err')
     remove(DRAFT_KEY(session.id))
     stopRest()
+    // Recuerda estas series para la próxima vez (también sin conexión)
+    const done = {}
+    blocks.forEach(b => b.sets.forEach((x, i) => { if (x.done) (done[b.exercise.id] ??= []).push({ set_number: i + 1, reps: x.r, weight_kg: Number(x.w) || 0 }) }))
+    rememberSets(done)
+    if (!isOnline()) { toast('Guardado en el teléfono. Se enviará a tu squad cuando vuelva la conexión.'); nav('/'); return }
     const { data: prs } = await supabase.rpc('session_prs', { p_session: session.id })
     if (prs?.length) { navigator.vibrate?.([80, 60, 80, 60, 200]); setRecords(prs) }
     else { toast('Entrenamiento guardado. Tu squad ya lo sabe.'); nav('/') }
@@ -343,5 +349,8 @@ async function previousSets(uid, exIds, currentSession) {
     ;(out[s.exercise_id] ??= []).push(s)
   }
   for (const k in out) out[k].sort((a, b) => a.set_number - b.set_number)
-  return out
+  // Con conexión se recuerdan; sin conexión se usan las últimas recordadas
+  if (Object.keys(out).length) rememberSets(out)
+  const missing = exIds.filter(id => !out[id])
+  return { ...recalledSets(missing), ...out }
 }

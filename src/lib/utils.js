@@ -77,6 +77,8 @@ const ERRORS = {
 }
 export function friendlyError(err) {
   const msg = err?.message || String(err)
+  if (msg.startsWith('OFFLINE: ')) return msg.slice(9)
+  if (/Failed to fetch|Load failed|NetworkError|fetch failed|network/i.test(msg)) return 'Sin conexión a internet. Inténtalo cuando vuelva la señal.'
   for (const k of Object.keys(ERRORS)) if (msg.includes(k)) return ERRORS[k]
   return 'Algo salió mal: ' + msg
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { routinesList } from '../lib/queries'
 import { useAuth } from '../lib/auth'
 import { PageHeader, Empty } from '../components/ui'
 import { DAYS_LONG } from '../lib/utils'
@@ -11,9 +11,7 @@ export default function Routines() {
   const [list, setList] = useState(null)
 
   useEffect(() => {
-    supabase.from('routines')
-      .select('id, name, day_of_week, routine_exercises(position, target_sets, exercise:exercises(name, muscle_group))')
-      .eq('owner_id', user.id).eq('archived', false).order('day_of_week', { nullsFirst: false })
+    routinesList(user.id)
       .then(({ data }) => setList(data || []))
   }, [user.id])
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import { applyTheme, saveLocalTheme } from './theme'
+import { clearAll } from './offline'
 
 const AuthCtx = createContext(null)
 
@@ -51,7 +52,15 @@ export function AuthProvider({ children }) {
     session, user: session?.user, profile, recovery,
     finishRecovery: () => setRecovery(false),
     refreshProfile: () => loadProfile(session?.user.id),
-    signOut: () => supabase.auth.signOut()
+    signOut: async () => {
+      // Sin conexión, Supabase no puede avisar al servidor: cerramos la sesión en el teléfono igualmente
+      const { error } = await supabase.auth.signOut().catch(e => ({ error: e }))
+      if (error) {
+        try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token$/.test(k)).forEach(k => localStorage.removeItem(k)) } catch { /* nada */ }
+        uidRef.current = null; setSession(null); setProfile(null); setRecovery(false)
+      }
+      await clearAll()
+    }
   }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }
