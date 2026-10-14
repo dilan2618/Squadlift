@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { Avatar, PageHeader, toast } from '../components/ui'
 import { friendlyError } from '../lib/utils'
 import NotificationsCard from '../components/NotificationsCard'
+import { prepareAvatar } from '../lib/image'
 
 export default function Profile() {
   const { user, profile, refreshProfile, signOut } = useAuth()
@@ -14,6 +15,7 @@ export default function Profile() {
   })
   const [busy, setBusy] = useState(false)
   const [pwd, setPwd] = useState('')
+  const [photoBusy, setPhotoBusy] = useState(false)
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
 
   async function save(e) {
@@ -30,15 +32,40 @@ export default function Profile() {
   }
 
   async function upload(e) {
-    const file = e.target.files?.[0]; if (!file) return
-    if (file.size > 3 * 1024 * 1024) return toast('La foto debe pesar menos de 3 MB', 'err')
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-    const path = `${user.id}/avatar-${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite elegir la misma foto otra vez
+    if (!file) return
+    if (!file.type.startsWith('image/') && !/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name)) return toast('Elige una imagen', 'err')
+    setPhotoBusy(true)
+    try {
+      const blob = await prepareAvatar(file)
+      const path = `${user.id}/avatar-${Date.now()}.jpg`
+      const { error } = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' })
+      if (error) throw error
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      const { error: e2 } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
+      if (e2) throw e2
+      await removeOldAvatar(path)
+      await refreshProfile(); toast('Foto de perfil actualizada')
+    } catch (err) {
+      toast(err.message?.startsWith('No pudimos') ? err.message : friendlyError(err), 'err')
+    } finally { setPhotoBusy(false) }
+  }
+
+  // Borra fotos anteriores para no acumular archivos
+  async function removeOldAvatar(keepPath) {
+    const { data } = await supabase.storage.from('avatars').list(user.id)
+    const old = (data || []).map(o => `${user.id}/${o.name}`).filter(p => p !== keepPath)
+    if (old.length) await supabase.storage.from('avatars').remove(old)
+  }
+
+  async function removePhoto() {
+    setPhotoBusy(true)
+    const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
+    if (!error) await removeOldAvatar(null)
+    setPhotoBusy(false)
     if (error) return toast(friendlyError(error), 'err')
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-    await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
-    await refreshProfile(); toast('Foto actualizada')
+    await refreshProfile(); toast('Foto quitada')
   }
 
   async function changePassword() {
@@ -53,11 +80,22 @@ export default function Profile() {
       <PageHeader eyebrow={`@${profile.username}`} title="Tu perfil" />
 
       <div className="flex items-center gap-4">
-        <Avatar profile={profile} size={72} />
-        <label className="btn-ghost cursor-pointer text-sm">
-          Cambiar foto
-          <input type="file" accept="image/*" className="sr-only" onChange={upload} />
+        <label className="relative cursor-pointer shrink-0" aria-label="Cambiar foto de perfil">
+          <Avatar profile={profile} size={84} />
+          <span className="absolute -right-0.5 -bottom-0.5 w-8 h-8 rounded-full bg-accent text-ink grid place-items-center ring-4 ring-bg">
+            {photoBusy
+              ? <span className="w-3.5 h-3.5 rounded-full border-2 border-ink border-t-transparent animate-spin" />
+              : <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>}
+          </span>
+          <input type="file" accept="image/*" className="sr-only" onChange={upload} disabled={photoBusy} />
         </label>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <label className="btn-ghost min-h-[40px] text-sm cursor-pointer">
+            {photoBusy ? 'Subiendo…' : profile.avatar_url ? 'Cambiar foto' : 'Subir foto'}
+            <input type="file" accept="image/*" className="sr-only" onChange={upload} disabled={photoBusy} />
+          </label>
+          {profile.avatar_url && !photoBusy && <button type="button" className="text-xs text-muted self-start" onClick={removePhoto}>Quitar foto</button>}
+        </div>
       </div>
 
       <form onSubmit={save} className="flex flex-col gap-4">
