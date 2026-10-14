@@ -5,6 +5,7 @@ import { load, save } from './lib/storage'
 import TabBar from './components/TabBar'
 import { Toaster } from './components/ui'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Today from './pages/Today'
 import Routines from './pages/Routines'
 import RoutineEditor from './pages/RoutineEditor'
@@ -21,7 +22,7 @@ const LAST_ROUTE = 'sl:last-route'
 const RESTORE_WINDOW_MS = 3 * 60 * 60 * 1000 // 3 horas
 
 export default function App() {
-  const { session, profile } = useAuth()
+  const { session, profile, recovery } = useAuth()
   const loc = useLocation()
   const nav = useNavigate()
   const restored = useRef(false)
@@ -56,11 +57,13 @@ export default function App() {
     return <div className="min-h-dvh grid place-items-center text-muted">Cargando…</div>
   }
   if (!session) return <Login />
+  if (recovery) return <><ResetPassword /><Toaster /></>
 
   const hideTabs = loc.pathname.startsWith('/entrenar/sesion')
   return (
     <>
       <main className="max-w-[480px] mx-auto px-4 pt-4 pb-36 flex flex-col gap-5 safe-top">
+        <div key={loc.pathname} className="page-enter flex flex-col gap-5">
         <Routes>
           <Route path="/" element={<Today />} />
           <Route path="/rutinas" element={<Routines />} />
@@ -75,6 +78,7 @@ export default function App() {
           <Route path="/perfil/apariencia" element={<Appearance />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </div>
       </main>
       {!hideTabs && <TabBar />}
       <Toaster />

@@ -7,6 +7,9 @@ const AuthCtx = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined) // undefined = cargando
   const [profile, setProfile] = useState(null)
+  // true cuando el usuario llega desde el enlace "recuperar contraseña" del correo
+  const [recovery, setRecovery] = useState(() =>
+    window.location.pathname === '/nueva-contrasena' || /type=recovery/.test(window.location.hash))
   const uidRef = useRef(null)
 
   const loadProfile = useCallback(async (uid) => {
@@ -33,7 +36,8 @@ export function AuthProvider({ children }) {
     // se difiere con setTimeout y solo se recarga el perfil si cambió el usuario.
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setTimeout(() => {
-        if (event === 'SIGNED_OUT') { uidRef.current = null; setSession(null); setProfile(null); return }
+        if (event === 'SIGNED_OUT') { uidRef.current = null; setSession(null); setProfile(null); setRecovery(false); return }
+        if (event === 'PASSWORD_RECOVERY') setRecovery(true)
         if (!s) return
         setSession(s)
         const uid = s.user.id
@@ -44,7 +48,8 @@ export function AuthProvider({ children }) {
   }, [loadProfile])
 
   const value = {
-    session, user: session?.user, profile,
+    session, user: session?.user, profile, recovery,
+    finishRecovery: () => setRecovery(false),
     refreshProfile: () => loadProfile(session?.user.id),
     signOut: () => supabase.auth.signOut()
   }

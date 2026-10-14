@@ -67,7 +67,13 @@ const ERRORS = {
   'Email not confirmed': 'Confirma tu correo antes de entrar. Revisa tu bandeja de entrada.',
   'User already registered': 'Ese correo ya tiene cuenta. Inicia sesión.',
   'profiles_username_key': 'Ese nombre de usuario ya está en uso.',
-  'username_check': 'El usuario debe tener 3–24 caracteres: minúsculas, números o _.'
+  'username_check': 'El usuario debe tener 3–24 caracteres: minúsculas, números o _.',
+  'should be different from the old password': 'La contraseña nueva debe ser distinta de la anterior.',
+  'Password should be at least': 'La contraseña necesita al menos 8 caracteres.',
+  'For security purposes, you can only request this after': 'Por seguridad, espera un minuto antes de pedir otro enlace.',
+  'rate limit': 'Se enviaron demasiados correos seguidos. Espera unos minutos e inténtalo de nuevo.',
+  'Auth session missing': 'El enlace ya no es válido o caducó. Pide uno nuevo desde "Olvidé mi contraseña".',
+  'otp_expired': 'El enlace caducó o ya se usó. Pide uno nuevo desde "Olvidé mi contraseña".'
 }
 export function friendlyError(err) {
   const msg = err?.message || String(err)

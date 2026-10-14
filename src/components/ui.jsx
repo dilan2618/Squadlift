@@ -57,7 +57,7 @@ export function Toaster() {
   useEffect(() => { if (!t) return; const h = setTimeout(() => setT(null), 2800); return () => clearTimeout(h) }, [t])
   if (!t) return null
   return (
-    <div role="status" className={`fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl font-bold text-sm text-center max-w-[calc(100%-32px)] ${t.kind === 'err' ? 'bg-danger text-bg' : 'bg-ok text-bg'}`}
+    <div role="status" className={`toast-anim fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl font-bold text-sm text-center max-w-[calc(100%-32px)] ${t.kind === 'err' ? 'bg-danger text-bg' : 'bg-ok text-bg'}`}
       style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))' }}>{t.msg}</div>
   )
 }

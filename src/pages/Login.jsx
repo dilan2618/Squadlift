@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { friendlyError } from '../lib/utils'
 import { Toaster } from '../components/ui'
+import { useAuth } from '../lib/auth'
+import { load, save } from '../lib/storage'
+import Welcome from './Welcome'
+
+const WELCOME_KEY = 'sl:welcome-seen'
 
 export default function Login() {
-  const [mode, setMode] = useState('login') // login | signup | reset
+  const { finishRecovery } = useAuth()
+  // La primera vez se ve la bienvenida; después, directo a entrar
+  const [mode, setMode] = useState(() => load(WELCOME_KEY) ? 'login' : 'welcome') // welcome | login | signup | reset
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -16,11 +23,19 @@ export default function Login() {
     // ¿Está activado Google en Supabase? Si no, el botón no se muestra.
     fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY } })
       .then(r => r.json()).then(j => setGoogleOn(!!j?.external?.google)).catch(() => setGoogleOn(false))
-    // Si volvemos de Google con un error en la URL, lo mostramos y limpiamos la URL
+    // Si volvemos de Google o de un enlace del correo con error en la URL, lo explicamos y limpiamos la URL
     const p = new URLSearchParams(window.location.search + '&' + window.location.hash.slice(1))
     const err = p.get('error_description') || p.get('error')
+    const code = p.get('error_code') || ''
     if (err) {
-      setMsg({ ok: false, text: 'No se pudo entrar con Google: ' + decodeURIComponent(err.replace(/\+/g, ' ')) })
+      const fromEmail = code === 'otp_expired' || /email link|expired/i.test(err) || window.location.pathname === '/nueva-contrasena'
+      if (fromEmail) {
+        setMode('reset')
+        setMsg({ ok: false, text: 'Ese enlace caducó o ya se usó. Escribe tu correo y te enviamos uno nuevo.' })
+      } else {
+        setMsg({ ok: false, text: 'No se pudo entrar con Google: ' + decodeURIComponent(err.replace(/\+/g, ' ')) })
+      }
+      finishRecovery()
       window.history.replaceState(null, '', '/')
     }
   }, [])
@@ -41,9 +56,9 @@ export default function Login() {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirect + '/perfil' })
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: redirect + '/nueva-contrasena' })
         if (error) throw error
-        setMsg({ ok: true, text: 'Si el correo tiene cuenta, te llegará un enlace para crear una contraseña nueva.' })
+        setMsg({ ok: true, text: `Listo. Si ${email.trim()} tiene cuenta, te llegará un correo con un enlace para crear tu contraseña nueva. Ábrelo en este mismo teléfono. Si no lo ves en unos minutos, revisa la carpeta de spam.` })
       }
     } catch (err) {
       setMsg({ ok: false, text: err.message?.startsWith('La contraseña') ? err.message : friendlyError(err) })
@@ -59,14 +74,19 @@ export default function Login() {
     if (error) { setBusy(false); setMsg({ ok: false, text: friendlyError(error) }) }
   }
 
+  const go = (m) => { save(WELCOME_KEY, true); setMode(m); setMsg(null) }
+  if (mode === 'welcome') return <><Welcome onStart={() => go('signup')} onLogin={() => go('login')} /><Toaster /></>
+
   const titles = { login: 'Entra a entrenar', signup: 'Crea tu cuenta', reset: 'Recupera tu acceso' }
   return (
     <div className="min-h-dvh max-w-[420px] mx-auto px-4 py-10 flex flex-col justify-center gap-8 safe-top">
       <Toaster />
-      <div className="flex flex-col gap-3">
+      <div key={mode} className="flex flex-col gap-3 page-enter">
         <div className="font-display font-bold uppercase text-[28px] tracking-wide">Squad<span className="text-accent">Lift</span></div>
         <h1 className="h1 text-[44px]">{titles[mode]}</h1>
-        <p className="text-muted m-0">Registra tus entrenamientos, cumple tu meta semanal y motívate con tu squad de hasta 7 personas.</p>
+        <p className="text-muted m-0">{mode === 'reset'
+          ? 'Escribe el correo con el que te registraste. Te enviaremos un enlace para crear una contraseña nueva.'
+          : 'Registra tus entrenamientos, cumple tu meta semanal y motívate con tu squad de hasta 7 personas.'}</p>
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
@@ -79,7 +99,9 @@ export default function Login() {
         {mode !== 'reset' && (
           <div><label className="label" htmlFor="password">Contraseña</label>
             <input id="password" type="password" className="field" value={password} onChange={e => setPassword(e.target.value)} required
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></div>
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
+            {mode === 'login' && <button type="button" className="text-xs text-accent font-semibold mt-2" onClick={() => { setMode('reset'); setMsg(null) }}>¿Olvidaste tu contraseña?</button>}
+          </div>
         )}
         {msg && <p className={`text-sm m-0 ${msg.ok ? 'text-ok' : 'text-danger'}`}>{msg.text}</p>}
         <button className="btn-primary w-full" disabled={busy || !email || (mode !== 'reset' && !password)}>
@@ -96,9 +118,9 @@ export default function Login() {
       <div className="flex flex-col gap-2 text-sm text-center">
         {mode === 'login' && <>
           <button className="text-accent font-semibold" onClick={() => { setMode('signup'); setMsg(null) }}>¿No tienes cuenta? Regístrate</button>
-          <button className="text-muted" onClick={() => { setMode('reset'); setMsg(null) }}>Olvidé mi contraseña</button>
         </>}
         {mode !== 'login' && <button className="text-accent font-semibold" onClick={() => { setMode('login'); setMsg(null) }}>Ya tengo cuenta</button>}
+        <button className="text-muted text-xs mt-2" onClick={() => { setMode('welcome'); setMsg(null) }}>← Volver al inicio</button>
       </div>
     </div>
   )
