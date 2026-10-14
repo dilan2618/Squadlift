@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Tema por defecto (Fuego). El tema elegido los reemplaza al abrir la app. */
+  --c-accent: 255 169 77; --c-ok: 95 212 168; --c-danger: 247 140 140;
+  --c-bg: 19 22 29; --c-surface: 27 31 40; --c-surface2: 36 42 53; --c-surface3: 58 66 82; --c-line: 47 54 68;
+  --c-fg: 237 239 244; --c-muted: 140 147 165; --c-ink: 20 22 28; --c-ondark: 19 22 29;
+  --r-lg: 8px; --r-xl: 12px; --r-2xl: 16px;
+  color-scheme: dark;
+}
+html, body { background: rgb(var(--c-bg)); color: rgb(var(--c-fg)); transition: background-color .25s; }
+body { font-family: Manrope, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+.num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; border-radius: 6px; }
+input, select, textarea { color-scheme: inherit; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-top { padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
+
+@layer components {
+  .h1 { @apply font-display font-bold uppercase text-[34px] leading-none tracking-wide; text-wrap: balance; }
+  .h2 { @apply font-display font-bold uppercase text-xl tracking-wide; }
+  .eyebrow { @apply text-[11px] font-bold uppercase tracking-[.12em] text-muted; }
+  .card { @apply bg-surface rounded-2xl p-4 flex flex-col gap-3; }
+  .btn { @apply inline-flex items-center justify-center gap-2 min-h-[48px] px-5 rounded-xl font-bold transition disabled:opacity-45 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-accent text-ink active:scale-[.98]; }
+  .btn-ghost { @apply btn bg-surface2 text-fg; }
+  .chip { @apply text-xs font-semibold px-3 py-1.5 rounded-full bg-surface2 text-muted whitespace-nowrap; }
+  .chip-on { @apply bg-accent/15 text-accent; }
+  .field { @apply w-full h-12 px-3.5 rounded-xl bg-surface2 border border-transparent focus:border-accent focus:outline-none; }
+  .label { @apply text-xs font-semibold text-muted mb-1.5 block; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
